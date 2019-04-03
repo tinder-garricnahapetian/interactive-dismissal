@@ -9,7 +9,7 @@ final class SheetPresentationController: UIPresentationController {
 
     let animatedPresentation: VerticalPresentationTransition = VerticalPresentationTransition(proportion: 0.7)
 
-    private(set) var animatedDismissal: VerticalDismissalTransition?
+    private(set) var animatedDismissal: DismissalTransition?
     private(set) var interactiveDismissal: UIPercentDrivenInteractiveTransition?
 
     private let tapGesture: UITapGestureRecognizer = .init()
@@ -27,13 +27,11 @@ final class SheetPresentationController: UIPresentationController {
             return
         }
 
-        presentedViewController.view.layer.cornerRadius = 15
-        presentedViewController.view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
-        presentedViewController.view.addGestureRecognizer(panGesture)
+        presentedView?.addGestureRecognizer(panGesture)
         panGesture.addTarget(self, action: #selector(didPan))
 
         tapGesture.delegate = self
-        tapGesture.addTarget(self, action: #selector(tapped))
+        tapGesture.addTarget(self, action: #selector(didTapOutside(gesture:)))
         containerView.addGestureRecognizer(tapGesture)
         containerView.backgroundColor = .clear
 
@@ -62,8 +60,8 @@ final class SheetPresentationController: UIPresentationController {
     }
 
     @objc
-    private func tapped() {
-        animatedDismissal = VerticalDismissalTransition(isInteractive: false)
+    private func didTapOutside(gesture: UITapGestureRecognizer) {
+        animatedDismissal = DismissalTransition(isInteractive: false)
         didTapOutside?()
     }
 
@@ -84,7 +82,7 @@ final class SheetPresentationController: UIPresentationController {
 
         switch gesture.state {
         case .began:
-            animatedDismissal = VerticalDismissalTransition(isInteractive: true)
+            animatedDismissal = DismissalTransition(isInteractive: true)
             interactiveDismissal = UIPercentDrivenInteractiveTransition()
             didBeginPan?()
         case .changed:
@@ -99,6 +97,12 @@ final class SheetPresentationController: UIPresentationController {
             break
         }
     }
+
+    func animate() {
+        UIView.animate(withDuration: 5) {
+            self.presentedView?.frame = UIScreen.main.bounds
+        }
+    }
 }
 
 // MARK: - UIGestureRecognizerDelegate
@@ -107,5 +111,52 @@ extension SheetPresentationController: UIGestureRecognizerDelegate {
 
     func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
         return tapGesture == gestureRecognizer && touch.view == containerView
+    }
+}
+
+// MARK: - Dismissal Transition
+
+extension SheetPresentationController {
+
+    final class DismissalTransition: NSObject {
+
+        let isInteractive: Bool
+        let duration: TimeInterval
+
+        init(isInteractive: Bool = false, duration: TimeInterval = 0.3) {
+            self.isInteractive = isInteractive
+            self.duration = duration
+        }
+    }
+}
+
+extension SheetPresentationController.DismissalTransition: UIViewControllerAnimatedTransitioning {
+
+    func animateTransition(using transitionContext: UIViewControllerContextTransitioning) {
+        guard let presentedView = transitionContext.view(forKey: .from) else {
+            return
+        }
+
+        let duration = transitionDuration(using: transitionContext)
+
+        UIView.animate(withDuration: duration, animations: {
+            presentedView.frame.origin.y = transitionContext.containerView.frame.height
+        }) { _ in
+            transitionContext.completeTransition(!transitionContext.transitionWasCancelled)
+
+            guard self.isInteractive else {
+                return
+            }
+
+            if transitionContext.transitionWasCancelled {
+                transitionContext.cancelInteractiveTransition()
+            } else {
+                transitionContext.finishInteractiveTransition()
+            }
+        }
+    }
+
+    func transitionDuration(using transitionContext: UIViewControllerContextTransitioning?) -> TimeInterval {
+        return duration
     }
 }
