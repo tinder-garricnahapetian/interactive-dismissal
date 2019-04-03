@@ -54,10 +54,46 @@ class MainViewController: UIViewController, UIViewControllerTransitioningDelegat
     
     @objc
     private func didTap(button: UIButton) {
-        let sheet = SheetViewController()
-        sheet.modalPresentationStyle = .custom
-        sheet.transitioningDelegate = transitioningAdaptor
-        present(sheet, animated: true, completion: nil)
+        presentSheetViewController()
+    }
+
+    let contentViewController = UIViewController()
+    lazy var myNavigationController = UINavigationController(rootViewController: contentViewController)
+
+    private func presentSheetViewController() {
+//        contentViewController.view.backgroundColor = .white
+        contentViewController.view.layer.cornerRadius = 15
+        contentViewController.view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        contentViewController.view.layer.masksToBounds = true
+
+        myNavigationController.modalPresentationStyle = .custom
+        myNavigationController.transitioningDelegate = transitioningAdaptor
+        contentViewController.navigationItem.rightBarButtonItem = UIBarButtonItem(
+            barButtonSystemItem: .add, target: self, action: #selector(didTapPush)
+        )
+
+        myNavigationController.navigationBar.layer.cornerRadius = 15
+        myNavigationController.navigationBar.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        myNavigationController.navigationBar.layer.masksToBounds = true
+
+        myNavigationController.navigationBar.subviews.forEach {
+            $0.layer.cornerRadius = 15
+            $0.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        }
+
+        present(myNavigationController, animated: true)
+    }
+
+    let otherAdaptor = ViewControllerTransitioningAdapter()
+
+    @objc
+    private func didTapPush(sender: UIBarButtonItem) {
+        let viewController = UIViewController()
+        viewController.view.backgroundColor = .blue
+        viewController.view.layer.cornerRadius = 15
+        viewController.view.layer.maskedCorners = [.layerMinXMinYCorner, .layerMaxXMinYCorner]
+        viewController.view.layer.masksToBounds = true
+        myNavigationController.pushViewController(viewController, animated: true)
     }
 }
 
