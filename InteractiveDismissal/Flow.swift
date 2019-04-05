@@ -8,17 +8,29 @@
 
 import UIKit
 
-final class Flow {
+final class Flow: NSObject {
 
     var sheetViewController: SheetViewController!
     let navigationController: UINavigationController = .init()
-    let rootViewController: ContentViewController = .init()
-    let detailViewController: UIViewController = .init()
+
+    var rootViewController: UIViewController!
+
+    var contentViewController: ContentViewController? {
+        return rootViewController as? ContentViewController
+    }
 
     let transitioningAdaptor: ViewControllerTransitioningAdapter = .init()
     private var sheetPresentationController: SheetPresentationController?
 
-    func start(presenter: UIViewController) {
+    func start(statically: Bool, presenter: UIViewController) {
+        if statically {
+            let viewController = UIViewController()
+            viewController.view.backgroundColor = .red
+            rootViewController = viewController
+        } else {
+            rootViewController = makeContentViewController()
+        }
+
         let handleBar = UIView(frame: CGRect(x: 0, y: 0, width: 35, height: 5))
         handleBar.backgroundColor = UIColor.lightGray.withAlphaComponent(0.5)
         handleBar.layer.cornerRadius = 2.5
@@ -33,17 +45,31 @@ final class Flow {
         navigationBar.barTintColor = .white
         navigationBar.tintColor = .red
         navigationBar.setTitleVerticalPositionAdjustment(-10, for: .default)
+        navigationController.delegate = self
         navigationController.setViewControllers([rootViewController], animated: false)
-
         sheetViewController = SheetViewController(contentViewController: navigationController)
         sheetViewController.modalPresentationStyle = .custom
         sheetViewController.transitioningDelegate = configuredAdaptor()
-        presenter.present(sheetViewController, animated: true, completion: nil)
 
-        rootViewController.didTapPush = {
-            self.detailViewController.view.backgroundColor = .red
-            self.navigationController.pushViewController(self.detailViewController, animated: true)
+        presenter.present(sheetViewController, animated: true) { [weak self] in
+            self?.sheetPresentationController?.handleBarView = navigationBar
+            self?.sheetPresentationController?.scrollView = self?.contentViewController?.tableView
         }
+    }
+
+    private func makeContentViewController() -> ContentViewController {
+        let contentViewController = ContentViewController()
+        contentViewController.didTapPushStaticView = { [weak self] in
+            let staticViewController = UIViewController()
+            staticViewController.view.backgroundColor = .red
+            self?.navigationController.pushViewController(staticViewController, animated: true)
+        }
+        contentViewController.didTapPushTableView = { [weak self] in
+            if let contentViewController = self?.makeContentViewController() {
+                self?.navigationController.pushViewController(contentViewController, animated: true)
+            }
+        }
+        return contentViewController
     }
 
     private func configuredAdaptor() -> ViewControllerTransitioningAdapter {
@@ -52,11 +78,9 @@ final class Flow {
                 self?.sheetPresentationController = SheetPresentationController(presentation: presentation)
                 return self?.sheetPresentationController?
                     .onTapOutside {
-                        // move out to flow?
                         presentation.presented.dismiss(animated: true)
                     }
                     .onPanBegan {
-                        // move out to flow?
                         presentation.presented.dismiss(animated: true)
                 }
             }
@@ -71,6 +95,18 @@ final class Flow {
         }
     }
 }
+
+// MARK: -
+
+extension Flow: UINavigationControllerDelegate {
+    func navigationController(_ navigationController: UINavigationController, didShow viewController: UIViewController, animated: Bool) {
+        if let contentViewController = viewController as? ContentViewController {
+            sheetPresentationController?.scrollView = contentViewController.tableView
+        }
+    }
+}
+
+// MARK: - Sheet Presentation Controller
 
 private extension SheetPresentationController {
 
